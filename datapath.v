@@ -1,6 +1,6 @@
-module datapath(input clk,rst,Reg_Write,memWrite,memRead,RegDst,ALUsrc,memToReg,PCsrc,Jmp,input [2:0]ALU_control,output [31:0]inst,output Zero);
-    wire [31:0]writeData,regAddress,instAddress,readDataMem,Write_Data,Read_Data1, Read_Data2,ALUin1,ALUin2,ALUout,PCsrcIn,addIn,branchIn,notJmp;
-    wire [4:0]Read_Reg1, Read_Reg2, Write_Reg;
+module datapath(input clk,rst,Reg_Write,memWrite,memRead,RegDst,ALUsrc,memToReg,PCsrc,Jmp,link31,writePC,Jumpinp,input [2:0]ALU_control,output [31:0]inst,output Zero);
+    wire [31:0]writeData,regAddress,instAddress,readDataMem,Write_Data,Read_Data1, Read_Data2,ALUin2,ALUout,PCsrcIn,addIn,branchIn,notJmp,memData,Jump;
+    wire [4:0]Read_Reg1, Read_Reg2, Write_Reg,outReg;
 
     register PC(
         .clk(clk),
@@ -28,9 +28,17 @@ module datapath(input clk,rst,Reg_Write,memWrite,memRead,RegDst,ALUsrc,memToReg,
         .o(notJmp),
         .s(PCsrc)
     );
+
+    mux2nton Jumpinmux(
+        .a({instAddress[31:28],inst[25:0],2'b00}),
+        .b(Read_Data1),
+        .o(Jump),
+        .s(Jumpinp)
+    );
+
     mux2nton Jmpmux(
         .a(notJmp),
-        .b({instAddress[31:28],inst[25:0],2'b00}),
+        .b(Jump),
         .o(PCsrcIn),
         .s(Jmp)
     );
@@ -43,8 +51,15 @@ module datapath(input clk,rst,Reg_Write,memWrite,memRead,RegDst,ALUsrc,memToReg,
     mux2nton #5 dstReg(
         .a(inst[20:16]),
         .b(inst[15:11]),
-        .o(Write_Reg),
+        .o(outReg),
         .s(RegDst)
+    );
+
+    mux2nton #5 reg31(
+        .a(outReg),
+        .b(5'd31),
+        .o(Write_Reg),
+        .s(link31)
     );
 
     mux2nton ALUB(
@@ -82,10 +97,17 @@ module datapath(input clk,rst,Reg_Write,memWrite,memRead,RegDst,ALUsrc,memToReg,
     );
 
     mux2nton memtoreg(
-        .a(readDataMem),
-        .b(ALUout),
-        .o(Write_Data),
+        .b(readDataMem),
+        .a(ALUout),
+        .o(memData),
         .s(memToReg)
+    );
+
+    mux2nton PCdata(
+        .b(notJmp),
+        .a(memData),
+        .o(Write_Data),
+        .s(writePC)
     );
 
 endmodule
